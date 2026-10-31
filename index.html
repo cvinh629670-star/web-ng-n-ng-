@@ -373,6 +373,9 @@
               </select>
 
               <!-- Export Dropdown -->
+              <button onclick="openDeleteAllModal()" class="px-3 py-2 rounded-xl bg-rose-50 hover:bg-rose-100 dark:bg-rose-950/40 dark:hover:bg-rose-900/60 text-rose-600 dark:text-rose-400 text-xs font-bold transition flex items-center gap-1.5">
+                <i class="fa-solid fa-trash-can"></i> Xóa tất cả
+              </button>
               <div class="relative group">
                 <button class="px-3 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 dark:bg-slate-700 dark:hover:bg-slate-600 text-xs font-bold transition flex items-center gap-1.5">
                   <i class="fa-solid fa-file-export text-slate-500"></i> Xuất
@@ -938,9 +941,10 @@
         <i class="fa-solid fa-trash-can"></i>
       </div>
       <div>
-        <h3 class="text-lg font-bold">Xác nhận xóa từ vựng</h3>
+        <h3 id="delete-modal-title" class="text-lg font-bold">Xác nhận xóa từ vựng</h3>
         <p class="text-xs text-slate-500 dark:text-slate-400 mt-1">
-          Bạn có chắc chắn muốn xóa từ vựng <b id="delete-word-target" class="text-slate-900 dark:text-white">---</b> khỏi danh sách?
+          <span id="delete-modal-message">Bạn có chắc chắn muốn xóa từ vựng</span>
+          <b id="delete-word-target" class="text-slate-900 dark:text-white">---</b><span id="delete-modal-suffix">khỏi danh sách?</span>
         </p>
       </div>
       <div class="flex items-center justify-end gap-3 pt-2">
@@ -978,6 +982,7 @@
     let currentTab = 'vocab';
     let soundEnabled = true;
     let targetDeleteId = null;
+    let deleteAllMode = false;
 
     // Initialize Streak UI
     function updateStreak() {
@@ -1525,26 +1530,57 @@
 
     function openDeleteModal(id) {
       targetDeleteId = id;
+      deleteAllMode = false;
       const item = wordsState.find(w => w.id === id);
       if (item) {
+        document.getElementById('delete-modal-title').innerText = 'Xác nhận xóa từ vựng';
+        document.getElementById('delete-modal-message').innerText = 'Bạn có chắc chắn muốn xóa từ vựng';
         document.getElementById('delete-word-target').innerText = item.word;
+        document.getElementById('delete-modal-suffix').innerText = 'khỏi danh sách?';
         document.getElementById('delete-modal').classList.remove('hidden');
         document.getElementById('confirm-delete-btn').onclick = () => confirmDeleteWord();
       }
     }
 
+    function openDeleteAllModal() {
+      if (wordsState.length === 0) {
+        showToast('Danh sách từ vựng đang trống!', 'info');
+        return;
+      }
+
+      targetDeleteId = null;
+      deleteAllMode = true;
+      document.getElementById('delete-modal-title').innerText = 'Xác nhận xóa tất cả từ vựng';
+      document.getElementById('delete-modal-message').innerText = `Bạn có chắc chắn muốn xóa toàn bộ ${wordsState.length} từ vựng của tất cả ngôn ngữ?`;
+      document.getElementById('delete-word-target').innerText = '';
+      document.getElementById('delete-modal-suffix').innerText = 'Thao tác này không thể hoàn tác.';
+      document.getElementById('delete-modal').classList.remove('hidden');
+      document.getElementById('confirm-delete-btn').onclick = () => confirmDeleteAllWords();
+    }
+
     function closeDeleteModal() {
       document.getElementById('delete-modal').classList.add('hidden');
       targetDeleteId = null;
+      deleteAllMode = false;
     }
 
     function confirmDeleteWord() {
-      if (!targetDeleteId) return;
+      if (deleteAllMode || !targetDeleteId) return;
       const item = wordsState.find(w => w.id === targetDeleteId);
       wordsState = wordsState.filter(w => w.id !== targetDeleteId);
       saveState();
       closeDeleteModal();
       if (item) showToast(`🗑️ Đã xóa từ "${item.word}"!`, 'info');
+      renderAllViews();
+    }
+
+    function confirmDeleteAllWords() {
+      if (!deleteAllMode || wordsState.length === 0) return;
+      const deletedCount = wordsState.length;
+      wordsState = [];
+      saveState();
+      closeDeleteModal();
+      showToast(`🗑️ Đã xóa toàn bộ ${deletedCount} từ vựng của tất cả ngôn ngữ!`, 'info');
       renderAllViews();
     }
 
