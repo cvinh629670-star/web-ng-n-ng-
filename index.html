@@ -391,7 +391,7 @@
 
           <!-- Table Container -->
           <div class="overflow-x-auto rounded-xl border border-slate-200 dark:border-slate-700">
-            <table class="w-full text-left text-sm">
+            <table id="vocab-table" class="w-full text-left text-sm">
               <thead class="bg-slate-100 dark:bg-slate-900/80 text-xs font-bold uppercase text-slate-500 dark:text-slate-400">
                 <tr>
                   <th class="p-3.5">Từ Vựng & Nghe</th>
@@ -1349,7 +1349,10 @@
     function renderVocabList() {
       const tbody = document.getElementById('vocab-table-body');
       const emptyState = document.getElementById('vocab-empty-state');
+      const table = document.getElementById('vocab-table');
       if (!tbody) return;
+
+      if (table) table.classList.toggle('min-w-[720px]', currentLang === 'ko');
 
       const searchVal = (document.getElementById('search-vocab-input')?.value || '').toLowerCase();
       const filterSrs = document.getElementById('filter-srs-select')?.value || 'all';
@@ -1387,7 +1390,7 @@
                 <i class="fa-solid fa-volume-high"></i>
               </button>
               <div>
-                <span class="font-bold text-slate-900 dark:text-white block text-base">${escapeHTML(item.word)}</span>
+                <span class="font-bold text-slate-900 dark:text-white block text-base ${item.lang === 'ko' ? 'whitespace-nowrap' : ''}">${escapeHTML(item.word)}</span>
                 ${item.phonetic ? `<span class="text-xs text-slate-400 italic">${escapeHTML(item.phonetic)}</span>` : ''}
               </div>
             </div>
