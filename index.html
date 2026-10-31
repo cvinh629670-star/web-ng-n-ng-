@@ -372,10 +372,24 @@
                 <option value="vip">VIP (👑 Level 8+)</option>
               </select>
 
+              <details id="vocab-delete-menu" class="relative">
+                <summary class="list-none cursor-pointer px-3 py-2 rounded-xl bg-rose-50 hover:bg-rose-100 dark:bg-rose-950/40 dark:hover:bg-rose-900/60 text-rose-600 dark:text-rose-400 text-xs font-bold transition flex items-center gap-1.5">
+                  <i class="fa-solid fa-trash-can"></i> Xóa <i class="fa-solid fa-chevron-down text-[10px]"></i>
+                </summary>
+                <div class="absolute right-0 mt-1 w-64 bg-white dark:bg-slate-800 rounded-xl shadow-xl border border-slate-200 dark:border-slate-700 py-1 z-30">
+                  <button onclick="requestBulkDelete('selected')" class="w-full text-left px-3 py-2.5 text-xs font-semibold hover:bg-slate-100 dark:hover:bg-slate-700">
+                    Xóa các từ đang chọn (<span id="selected-word-count">0</span>)
+                  </button>
+                  <button onclick="requestBulkDelete('language')" class="w-full text-left px-3 py-2.5 text-xs font-semibold hover:bg-slate-100 dark:hover:bg-slate-700">
+                    Xóa tất cả từ của ngôn ngữ đang học
+                  </button>
+                  <button onclick="requestBulkDelete('all')" class="w-full text-left px-3 py-2.5 text-xs font-semibold text-rose-600 dark:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-950/40">
+                    Xóa tất cả từ vựng của mọi ngôn ngữ
+                  </button>
+                </div>
+              </details>
+
               <!-- Export Dropdown -->
-              <button onclick="openDeleteAllModal()" class="px-3 py-2 rounded-xl bg-rose-50 hover:bg-rose-100 dark:bg-rose-950/40 dark:hover:bg-rose-900/60 text-rose-600 dark:text-rose-400 text-xs font-bold transition flex items-center gap-1.5">
-                <i class="fa-solid fa-trash-can"></i> Xóa tất cả
-              </button>
               <div class="relative group">
                 <button class="px-3 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 dark:bg-slate-700 dark:hover:bg-slate-600 text-xs font-bold transition flex items-center gap-1.5">
                   <i class="fa-solid fa-file-export text-slate-500"></i> Xuất
@@ -397,6 +411,9 @@
             <table id="vocab-table" class="w-full text-left text-sm">
               <thead class="bg-slate-100 dark:bg-slate-900/80 text-xs font-bold uppercase text-slate-500 dark:text-slate-400">
                 <tr>
+                  <th class="p-3.5 text-center">
+                    <input id="select-visible-words" type="checkbox" aria-label="Chọn tất cả từ đang hiển thị" onchange="selectVisibleWords(this.checked)" class="rounded border-slate-300 text-rose-600 focus:ring-rose-500">
+                  </th>
                   <th class="p-3.5">Từ Vựng & Nghe</th>
                   <th class="p-3.5">Nghĩa & Ví Dụ Mẫu</th>
                   <th class="p-3.5 text-center">Tiến độ SRS</th>
@@ -982,7 +999,8 @@
     let currentTab = 'vocab';
     let soundEnabled = true;
     let targetDeleteId = null;
-    let deleteAllMode = false;
+    let pendingDeleteIds = [];
+    const selectedWordIds = new Set();
 
     // Initialize Streak UI
     function updateStreak() {
@@ -1357,7 +1375,7 @@
       const table = document.getElementById('vocab-table');
       if (!tbody) return;
 
-      if (table) table.classList.toggle('min-w-[720px]', currentLang === 'ko');
+      if (table) table.classList.toggle('min-w-[760px]', currentLang === 'ko');
 
       const searchVal = (document.getElementById('search-vocab-input')?.value || '').toLowerCase();
       const filterSrs = document.getElementById('filter-srs-select')?.value || 'all';
@@ -1380,6 +1398,15 @@
         else if (filterSrs === 'vip') filtered = filtered.filter(w => w.srsLevel >= 8);
       }
 
+      const selectedCount = document.getElementById('selected-word-count');
+      if (selectedCount) selectedCount.innerText = selectedWordIds.size.toString();
+      const selectVisibleCheckbox = document.getElementById('select-visible-words');
+      if (selectVisibleCheckbox) {
+        const selectedVisibleCount = filtered.filter(item => selectedWordIds.has(item.id)).length;
+        selectVisibleCheckbox.checked = filtered.length > 0 && selectedVisibleCount === filtered.length;
+        selectVisibleCheckbox.indeterminate = selectedVisibleCount > 0 && selectedVisibleCount < filtered.length;
+      }
+
       if (filtered.length === 0) {
         tbody.innerHTML = '';
         if (emptyState) emptyState.classList.remove('hidden');
@@ -1389,6 +1416,9 @@
       if (emptyState) emptyState.classList.add('hidden');
       tbody.innerHTML = filtered.map(item => `
         <tr class="hover:bg-slate-50 dark:hover:bg-slate-800/50 transition">
+          <td class="p-3.5 text-center">
+            <input type="checkbox" value="${escapeHTML(item.id)}" ${selectedWordIds.has(item.id) ? 'checked' : ''} onchange="setWordSelected(this.value, this.checked)" aria-label="Chọn từ ${escapeHTML(item.word)}" class="rounded border-slate-300 text-rose-600 focus:ring-rose-500">
+          </td>
           <td class="p-3.5">
             <div class="flex items-center gap-2.5">
               <button onclick="speakWord('${escapeHTML(item.word)}', '${item.lang}')" class="w-8 h-8 rounded-xl bg-theme-subtle text-theme-main hover:scale-105 transition flex items-center justify-center text-xs flex-shrink-0" title="Phát âm">
@@ -1420,6 +1450,37 @@
           </td>
         </tr>
       `).join('');
+    }
+
+    function setWordSelected(id, isSelected) {
+      if (isSelected) selectedWordIds.add(id);
+      else selectedWordIds.delete(id);
+      updateSelectionUI();
+    }
+
+    function selectVisibleWords(isSelected) {
+      const visibleIds = Array.from(document.querySelectorAll('#vocab-table-body input[type="checkbox"]'))
+        .map(checkbox => checkbox.value);
+      visibleIds.forEach(id => {
+        if (isSelected) selectedWordIds.add(id);
+        else selectedWordIds.delete(id);
+      });
+      document.querySelectorAll('#vocab-table-body input[type="checkbox"]').forEach(checkbox => {
+        checkbox.checked = isSelected;
+      });
+      updateSelectionUI();
+    }
+
+    function updateSelectionUI() {
+      const visibleCheckboxes = Array.from(document.querySelectorAll('#vocab-table-body input[type="checkbox"]'));
+      const selectedVisibleCount = visibleCheckboxes.filter(checkbox => selectedWordIds.has(checkbox.value)).length;
+      const selectedCount = document.getElementById('selected-word-count');
+      if (selectedCount) selectedCount.innerText = selectedWordIds.size.toString();
+      const selectVisibleCheckbox = document.getElementById('select-visible-words');
+      if (selectVisibleCheckbox) {
+        selectVisibleCheckbox.checked = visibleCheckboxes.length > 0 && selectedVisibleCount === visibleCheckboxes.length;
+        selectVisibleCheckbox.indeterminate = selectedVisibleCount > 0 && selectedVisibleCount < visibleCheckboxes.length;
+      }
     }
 
     function handleAddWord(e) {
@@ -1530,7 +1591,7 @@
 
     function openDeleteModal(id) {
       targetDeleteId = id;
-      deleteAllMode = false;
+      pendingDeleteIds = [];
       const item = wordsState.find(w => w.id === id);
       if (item) {
         document.getElementById('delete-modal-title').innerText = 'Xác nhận xóa từ vựng';
@@ -1542,45 +1603,71 @@
       }
     }
 
-    function openDeleteAllModal() {
-      if (wordsState.length === 0) {
-        showToast('Danh sách từ vựng đang trống!', 'info');
+    function requestBulkDelete(scope) {
+      const deleteMenu = document.getElementById('vocab-delete-menu');
+      if (deleteMenu) deleteMenu.open = false;
+
+      if (scope === 'selected') {
+        pendingDeleteIds = wordsState.filter(item => selectedWordIds.has(item.id)).map(item => item.id);
+      } else if (scope === 'language') {
+        pendingDeleteIds = wordsState.filter(item => item.lang === currentLang).map(item => item.id);
+      } else if (scope === 'all') {
+        pendingDeleteIds = wordsState.map(item => item.id);
+      } else {
         return;
       }
 
+      if (pendingDeleteIds.length === 0) {
+        showToast(scope === 'selected' ? 'Bạn chưa chọn từ vựng nào để xóa!' : 'Không có từ vựng nào để xóa!', 'info');
+        return;
+      }
+
+      const deletePrompt = scope === 'selected'
+        ? `Bạn có chắc chắn muốn xóa ${pendingDeleteIds.length} từ đã chọn?`
+        : scope === 'language'
+          ? `Bạn có chắc chắn muốn xóa toàn bộ ${pendingDeleteIds.length} từ vựng tiếng ${currentLang.toUpperCase()}?`
+          : `Bạn có chắc chắn muốn xóa toàn bộ ${pendingDeleteIds.length} từ vựng của tất cả ngôn ngữ?`;
       targetDeleteId = null;
-      deleteAllMode = true;
-      document.getElementById('delete-modal-title').innerText = 'Xác nhận xóa tất cả từ vựng';
-      document.getElementById('delete-modal-message').innerText = `Bạn có chắc chắn muốn xóa toàn bộ ${wordsState.length} từ vựng của tất cả ngôn ngữ?`;
+      document.getElementById('delete-modal-title').innerText = 'Xác nhận xóa từ vựng';
+      document.getElementById('delete-modal-message').innerText = deletePrompt;
       document.getElementById('delete-word-target').innerText = '';
       document.getElementById('delete-modal-suffix').innerText = 'Thao tác này không thể hoàn tác.';
       document.getElementById('delete-modal').classList.remove('hidden');
-      document.getElementById('confirm-delete-btn').onclick = () => confirmDeleteAllWords();
+      document.getElementById('confirm-delete-btn').onclick = () => confirmBulkDelete();
+    }
+
+    function confirmBulkDelete() {
+      if (pendingDeleteIds.length === 0) return;
+      const idsToDelete = new Set(pendingDeleteIds);
+      const deletedCount = wordsState.filter(item => idsToDelete.has(item.id)).length;
+      if (deletedCount === 0) {
+        closeDeleteModal();
+        showToast('Không tìm thấy từ vựng để xóa!', 'info');
+        return;
+      }
+
+      wordsState = wordsState.filter(item => !idsToDelete.has(item.id));
+      pendingDeleteIds.forEach(id => selectedWordIds.delete(id));
+      saveState();
+      closeDeleteModal();
+      showToast(`🗑️ Đã xóa ${deletedCount} từ vựng!`, 'info');
+      renderAllViews();
     }
 
     function closeDeleteModal() {
       document.getElementById('delete-modal').classList.add('hidden');
       targetDeleteId = null;
-      deleteAllMode = false;
+      pendingDeleteIds = [];
     }
 
     function confirmDeleteWord() {
-      if (deleteAllMode || !targetDeleteId) return;
+      if (!targetDeleteId) return;
       const item = wordsState.find(w => w.id === targetDeleteId);
       wordsState = wordsState.filter(w => w.id !== targetDeleteId);
+      selectedWordIds.delete(targetDeleteId);
       saveState();
       closeDeleteModal();
       if (item) showToast(`🗑️ Đã xóa từ "${item.word}"!`, 'info');
-      renderAllViews();
-    }
-
-    function confirmDeleteAllWords() {
-      if (!deleteAllMode || wordsState.length === 0) return;
-      const deletedCount = wordsState.length;
-      wordsState = [];
-      saveState();
-      closeDeleteModal();
-      showToast(`🗑️ Đã xóa toàn bộ ${deletedCount} từ vựng của tất cả ngôn ngữ!`, 'info');
       renderAllViews();
     }
 
