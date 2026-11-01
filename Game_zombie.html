@@ -196,13 +196,13 @@ class AudioManager{
   this.on=true;
   this.zombieSound=new Audio('zombie_sound.mp3');
   this.zombieSound.preload='auto';
-  this.pistolSound=new Audio('sounds/súng lục.mp3');
+  this.pistolSound=new Audio('súng lục.mp3');
   this.pistolSound.preload='auto'
-  this.firesound=new Audio('sounds/súng lửa.mp3');
+  this.firesound=new Audio('súng lửa.mp3');
   this.firesound.preload='auto'
-  this.shotgunsound=new Audio('sounds/shotgun.mp3');
+  this.shotgunsound=new Audio('shotgun.mp3');
   this.shotgunsound.preload='auto'
-  this.tenluasound=new Audio('sounds/tên lửa.mp3');
+  this.tenluasound=new Audio('tên lửa.mp3');
   this.tenluasound.preload='auto'
 }
  init(){if(this.ctx){if(this.ctx.state==='suspended')this.ctx.resume();return}try{this.ctx=new(window.AudioContext||window.webkitAudioContext)()}catch(e){this.ctx=null}}
